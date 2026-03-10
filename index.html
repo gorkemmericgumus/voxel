@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxel</title>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: "Courier New", monospace;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: none;
+    }
+
+    #crosshair {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 18px; height: 18px;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #crosshair::before, #crosshair::after {
+      content: '';
+      position: absolute;
+      background: rgba(255,255,255,0.85);
+    }
+    #crosshair::before { width: 2px; height: 100%; left: 50%; transform: translateX(-50%); }
+    #crosshair::after  { width: 100%; height: 2px; top: 50%; transform: translateY(-50%); }
+
+    #inventory-bar {
+      position: fixed;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    #health-bar {
+      display: flex;
+      gap: 2px;
+      width: 100%;
+      max-width: 376px;
+      height: 6px;
+      background: rgba(60, 20, 20, 0.5);
+      border: 1px solid #222222;
+      border-radius: 0;
+      padding: 1px;
+      box-sizing: border-box;
+    }
+    #health-bar .health-segment {
+      flex: 1;
+      height: 100%;
+      background: rgba(180, 40, 40, 0.4);
+      border-radius: 0;
+      transition: background 0.15s ease;
+    }
+    #health-bar .health-segment.filled {
+      background: #c62828;
+    }
+    #energy-bar {
+      display: flex;
+      gap: 2px;
+      width: 100%;
+      max-width: 376px;
+      height: 6px;
+      background: rgba(20, 40, 60, 0.5);
+      border: 1px solid #222222;
+      border-radius: 0;
+      padding: 1px;
+      box-sizing: border-box;
+    }
+    #energy-bar .energy-segment {
+      flex: 1;
+      height: 100%;
+      background: rgba(40, 100, 180, 0.4);
+      border-radius: 0;
+      transition: background 0.15s ease;
+    }
+    #energy-bar .energy-segment.filled {
+      background: #1565c0;
+    }
+    #inventory-panel {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 25;
+      display: none;
+      padding: 12px 14px;
+      background: rgba(248, 246, 240, 0.92);
+      border: 2px solid #222222;
+      border-radius: 0;
+    }
+    #inventory-panel.open {
+      display: block;
+    }
+    #inventory-panel .inventory-grid {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      gap: 4px;
+    }
+    .inv-slot {
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 252, 245, 0.25);
+      border: 1px solid #222222;
+      border-radius: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .inv-slot .slot-color {
+      width: 26px;
+      height: 26px;
+      border-radius: 0;
+      border: 1px solid #222222;
+    }
+    #hotbar {
+      display: flex;
+      gap: 4px;
+      padding: 6px 8px;
+      background: rgba(248, 246, 240, 0.35);
+      border: 1px solid #222222;
+      border-radius: 0;
+    }
+    #hotbar .inv-slot.hotbar-slot.selected {
+      border: 2px solid #222222;
+    }
+
+    #death-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(248, 246, 240, 0.92);
+      pointer-events: none;
+    }
+    #death-screen.visible {
+      display: flex;
+      pointer-events: auto;
+    }
+    #death-screen .death-panel {
+      padding: 24px 32px;
+      background: rgba(255, 252, 245, 0.25);
+      border: 1px solid #222222;
+      border-radius: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    #death-screen .death-inner {
+      padding: 16px 24px;
+      background: rgba(255, 252, 245, 0.2);
+      border: 1px solid #222222;
+      border-radius: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+    #death-screen h2 {
+      font-family: "Courier New", monospace;
+      font-size: 28px;
+      font-weight: normal;
+      color: #222222;
+      margin: 0;
+      letter-spacing: 0.05em;
+    }
+    #death-screen .respawn-btn {
+      font-family: "Courier New", monospace;
+      font-size: 16px;
+      font-weight: normal;
+      padding: 10px 24px;
+      background: rgba(255, 252, 245, 0.2);
+      border: 1px solid #222222;
+      color: #222222;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    #death-screen .respawn-btn:hover {
+      background: rgba(255, 252, 245, 0.35);
+    }
+    #death-screen .respawn-btn:active {
+      background: rgba(255, 252, 245, 0.45);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  <div id="crosshair"></div>
+  <div id="death-screen">
+    <div class="death-panel">
+      <div class="death-inner">
+        <h2>You Died</h2>
+        <button type="button" class="respawn-btn" id="respawn-btn">Respawn</button>
+      </div>
+    </div>
+  </div>
+  <div id="inventory-bar">
+    <div id="health-bar"></div>
+    <div id="energy-bar"></div>
+    <div id="hotbar"></div>
+  </div>
+  <div id="inventory-panel">
+    <div class="inventory-grid"></div>
+  </div>
+
+  <script type="module">
+    import { Engine } from './src/Engine.js';
+
+    const canvas = document.getElementById('game-canvas');
+    canvas.addEventListener('click', () => canvas.requestPointerLock());
+
+    const engine = new Engine();
+    engine._loop();
+    engine.init().catch(err => console.error('Init failed:', err));
+  </script>
+</body>
+</html>
